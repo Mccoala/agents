@@ -2,7 +2,7 @@ export default function CoffeeArea() {
   return (
     <group position={[-9.5, 0, 7.5]}>
       {/* Counter top */}
-      <mesh position={[0, 0.9, 0]} castShadow receiveShadow>
+      <mesh position={[0, 0.9, 0]}>
         <boxGeometry args={[3.2, 0.06, 0.7]} />
         <meshStandardMaterial color="#4a2c10" roughness={0.6} />
       </mesh>

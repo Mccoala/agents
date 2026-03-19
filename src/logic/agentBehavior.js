@@ -1,96 +1,89 @@
 import { MEETING_SEATS, COFFEE_SPOTS } from '../data/agents'
 
-const TASK_DESCRIPTIONS = {
-  working: [
-    'Analisando componentes UI...',
-    'Revisando código backend...',
-    'Rodando testes automatizados...',
-    'Verificando vulnerabilidades...',
-    'Processando PDF do pedido...',
-    'Gerando métricas do dashboard...',
-    'Atualizando rotas de entrega...',
-    'Monitorando logs do sistema...',
-    'Revisando pull request...',
-    'Otimizando queries do banco...',
-    'Verificando autenticação...',
-    'Processando pagamentos...',
-  ],
-  meeting: [
-    'Alinhando estratégia com equipe...',
-    'Revisando progresso do sprint...',
-    'Discutindo arquitetura...',
-  ],
-}
+const TASK_DESCRIPTIONS = [
+  'Analisando componentes UI...', 'Revisando código backend...',
+  'Rodando testes automatizados...', 'Verificando vulnerabilidades...',
+  'Processando extração do PDF...', 'Atualizando métricas do dashboard...',
+  'Atualizando rotas de entrega...', 'Monitorando logs do sistema...',
+  'Revisando pull request...', 'Otimizando queries do banco...',
+  'Verificando fluxo de autenticação...', 'Processando cobranças pendentes...',
+]
+
+const MEETING_MESSAGES = [
+  ['Encontrei um possível bug no módulo de rotas.', 'Deixa eu ver... confirmo o problema.'],
+  ['Precisamos melhorar a extração do PDF.', 'Concordo. O prompt precisa de ajuste.'],
+  ['A interface do dashboard está lenta.', 'Vou otimizar as queries e ver o que encontro.'],
+  ['Segurança: senhas ainda estão em plaintext.', 'Prioridade máxima. Vou criar a tarefa.'],
+  ['Deploy falhando no CI/CD.', 'Já vi o log. É uma variável de ambiente faltando.'],
+  ['Usuários reclamando do tempo de resposta.', 'Confirmo — o backend está sobrecarregado.'],
+]
 
 const TRANSITIONS = {
-  idle:    ['working', 'working', 'working', 'coffee'],
+  idle:    ['working', 'working', 'coffee'],
   working: ['working', 'done', 'meeting'],
   meeting: ['working', 'idle'],
   done:    ['coffee'],
-  coffee:  ['idle', 'idle', 'working'],
+  coffee:  ['idle', 'working'],
 }
 
-let meetingSeatIndex = 0
-let coffeeSeatIndex = 0
+let meetingSeatIdx = 0
 
-function pickNextState(currentState) {
-  const options = TRANSITIONS[currentState]
-  return options[Math.floor(Math.random() * options.length)]
+function pickNextState(state) {
+  const opts = TRANSITIONS[state]
+  return opts[Math.floor(Math.random() * opts.length)]
 }
 
-function getPositionForState(state, agent, agentIndex) {
-  switch (state) {
-    case 'working':
-    case 'idle':
-    case 'done':
-      return [...agent.deskPosition]
-    case 'meeting':
-      const seat = MEETING_SEATS[meetingSeatIndex % MEETING_SEATS.length]
-      meetingSeatIndex++
-      return [...seat]
-    case 'coffee':
-      const spot = COFFEE_SPOTS[agentIndex % COFFEE_SPOTS.length]
-      return [...spot]
-    default:
-      return [...agent.deskPosition]
+function getPositionForState(state, agent, idx) {
+  if (state === 'meeting') {
+    const seat = MEETING_SEATS[meetingSeatIdx % MEETING_SEATS.length]
+    meetingSeatIdx++
+    return [...seat]
   }
-}
-
-function getTaskDescription(state, agentIndex) {
-  const list = TASK_DESCRIPTIONS[state]
-  if (!list) return ''
-  return list[agentIndex % list.length]
+  if (state === 'coffee') return [...COFFEE_SPOTS[idx % COFFEE_SPOTS.length]]
+  return [...agent.deskPosition]
 }
 
 export function startAgentBehavior(store) {
-  const intervals = []
+  const handles = []
 
-  store.getState().agents.forEach((agent, index) => {
-    // Stagger start times so agents don't all move at once
-    const initialDelay = index * 800 + Math.random() * 2000
+  store.getState().agents.forEach((agent, idx) => {
+    const initialDelay = idx * 900 + Math.random() * 2000
 
-    const startTimeout = setTimeout(() => {
+    const t0 = setTimeout(() => {
       const tick = () => {
-        const { agents, setAgentState } = store.getState()
+        const { agents, setAgentState, addAgentMeetingLog } = store.getState()
         const current = agents.find(a => a.id === agent.id)
-        if (!current) return
+        if (!current || current.locked) return // respeita reunião com usuário
 
-        const nextState = pickNextState(current.state)
-        const nextPos = getPositionForState(nextState, current, index)
-        const taskDesc = getTaskDescription(nextState, index)
+        const next = pickNextState(current.state)
+        const pos  = getPositionForState(next, current, idx)
+        const desc = next === 'working' ? TASK_DESCRIPTIONS[idx % TASK_DESCRIPTIONS.length] : ''
 
-        setAgentState(agent.id, nextState, nextPos, taskDesc)
+        setAgentState(agent.id, next, pos, desc)
+
+        // Log se foi para reunião (entre agentes)
+        if (next === 'meeting') {
+          const pair = MEETING_MESSAGES[idx % MEETING_MESSAGES.length]
+          const t = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+          addAgentMeetingLog({ sender: current.name, text: pair[0], time: t, isSystem: false })
+          setTimeout(() => {
+            const { agents: ag, addAgentMeetingLog: log } = store.getState()
+            const other = ag.find(a => a.id !== agent.id && a.state === 'meeting' && !a.locked)
+            if (other) {
+              const t2 = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+              log({ sender: other.name, text: pair[1], time: t2, isSystem: false })
+            }
+          }, 1800)
+        }
       }
 
-      tick() // immediate first tick after delay
-
-      const interval = setInterval(tick, 4000 + Math.random() * 6000)
-      intervals.push(interval)
+      tick()
+      const interval = setInterval(tick, 5000 + Math.random() * 7000)
+      handles.push(interval)
     }, initialDelay)
 
-    intervals.push(startTimeout)
+    handles.push(t0)
   })
 
-  // Cleanup function
-  return () => intervals.forEach(i => { clearInterval(i); clearTimeout(i) })
+  return () => handles.forEach(h => { clearInterval(h); clearTimeout(h) })
 }

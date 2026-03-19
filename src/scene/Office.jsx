@@ -3,15 +3,10 @@ import { useRef } from 'react'
 export default function Office() {
   return (
     <group>
-      {/* Ambient + directional light */}
-      <ambientLight intensity={0.5} color="#f0f0ff" />
-      <directionalLight position={[5, 10, 5]} intensity={0.8} castShadow color="#fff8f0" />
-      <directionalLight position={[-8, 8, -5]} intensity={0.3} color="#e0e8ff" />
-
-      {/* Ceiling lights */}
-      <pointLight position={[-6, 3.8, 0]} intensity={0.6} color="#fff5e0" distance={12} />
-      <pointLight position={[6, 3.8, 0]} intensity={0.6} color="#fff5e0" distance={12} />
-      <pointLight position={[0, 3.8, -5]} intensity={0.4} color="#fff5e0" distance={10} />
+      {/* Lights — kept minimal for performance */}
+      <ambientLight intensity={0.7} color="#f0f0ff" />
+      <directionalLight position={[5, 10, 5]} intensity={0.6} color="#fff8f0" />
+      <pointLight position={[0, 3.8, 0]} intensity={0.8} color="#fff5e0" distance={20} />
 
       {/* Floor — dark concrete */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>

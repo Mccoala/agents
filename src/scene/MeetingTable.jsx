@@ -4,7 +4,7 @@ export default function MeetingTable() {
   return (
     <group position={[0, 0, 0]}>
       {/* Tabletop */}
-      <mesh position={[0, 0.75, 0]} castShadow receiveShadow>
+      <mesh position={[0, 0.75, 0]}>
         <cylinderGeometry args={[2.0, 2.0, 0.07, 32]} />
         <meshStandardMaterial color="#3d2005" roughness={0.5} metalness={0.1} />
       </mesh>
@@ -16,7 +16,7 @@ export default function MeetingTable() {
       </mesh>
 
       {/* Central leg */}
-      <mesh position={[0, 0.37, 0]} castShadow>
+      <mesh position={[0, 0.37, 0]}>
         <cylinderGeometry args={[0.08, 0.12, 0.75, 12]} />
         <meshStandardMaterial color="#2a2a2a" roughness={0.3} metalness={0.7} />
       </mesh>

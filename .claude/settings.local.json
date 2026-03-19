@@ -13,7 +13,8 @@
       "Bash(npm create:*)",
       "Bash(npx create-vite@latest . --template react)",
       "Bash(npm install:*)",
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "Bash(cd:*)"
     ]
   }
 }
