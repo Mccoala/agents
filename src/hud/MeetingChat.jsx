@@ -11,10 +11,15 @@ export default function MeetingChat() {
   const endUserMeeting = useAgentStore(s => s.endUserMeeting)
   const addMeetingMessage = useAgentStore(s => s.addMeetingMessage)
 
+  const addAgentToMeeting = useAgentStore(s => s.addAgentToMeeting)
+  const allAgents = useAgentStore(s => s.agents)
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [activeAgentIdx, setActiveAgentIdx] = useState(0)
+  const [showInvite, setShowInvite] = useState(false)
   const bottomRef = useRef()
+
+  const outsideAgents = allAgents.filter(a => !userMeetingAgentIds.includes(a.id))
 
   const meetingAgents = agents.filter(a => userMeetingAgentIds.includes(a.id))
   const activeAgent = meetingAgents[activeAgentIdx] || meetingAgents[0]
@@ -74,10 +79,31 @@ export default function MeetingChat() {
             {meetingAgents.map(a => a.name).join(', ')}
           </div>
         </div>
-        <button className="close-btn" onClick={handleEnd} style={{ fontSize: 11, padding: '4px 8px', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 6 }}>
-          ✕ Encerrar
-        </button>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          <button
+            onClick={() => setShowInvite(v => !v)}
+            style={{ fontSize: 11, padding: '4px 8px', background: 'rgba(139,92,246,0.3)', border: '1px solid rgba(167,139,250,0.4)', borderRadius: 6, color: '#c4b5fd', cursor: 'pointer' }}
+          >
+            + Convidar
+          </button>
+          <button className="close-btn" onClick={handleEnd} style={{ fontSize: 11, padding: '4px 8px', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 6 }}>
+            ✕ Encerrar
+          </button>
+        </div>
       </div>
+
+      {/* Invite panel */}
+      {showInvite && outsideAgents.length > 0 && (
+        <div style={{ padding: '6px 10px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+          <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10, width: '100%' }}>Convidar para a reunião:</span>
+          {outsideAgents.map(a => (
+            <button key={a.id} onClick={() => { addAgentToMeeting(a.id); setShowInvite(false) }}
+              style={{ padding: '3px 8px', borderRadius: 12, fontSize: 10, cursor: 'pointer', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.7)' }}>
+              {a.name}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Agent selector */}
       {meetingAgents.length > 1 && (

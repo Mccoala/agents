@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { AGENT_DEFINITIONS, DEFAULT_NAMES } from '../data/agents'
+import { AGENT_DEFINITIONS, DEFAULT_NAMES, MEETING_SEATS } from '../data/agents'
 
 const buildInitialAgents = () =>
   AGENT_DEFINITIONS.map((def, i) => ({
@@ -11,80 +11,105 @@ const buildInitialAgents = () =>
     position: [...def.deskPosition],
     taskProgress: 0,
     taskDescription: '',
-    locked: false, // locked = em reunião com usuário, não pode ser interrompido
+    locked: false,
   }))
 
 const useAgentStore = create((set, get) => ({
   agents: buildInitialAgents(),
   selectedAgentId: null,
 
-  // HUD visibility
+  // Manager
+  managerId: 1, // default: primeiro agente é gerente
+  setManager: (id) => set({ managerId: id }),
+
+  // HUD
   hudVisible: true,
   toggleHud: () => set(s => ({ hudVisible: !s.hudVisible })),
 
-  // Meeting state
+  // Meeting
   userMeetingActive: false,
   userMeetingAgentIds: [],
-  conversationId: null,           // Supabase conversation ID
+  conversationId: null,
   meetingChatLog: [],
-
-  // Agent-to-agent meetings chat log (para acompanhar)
-  agentMeetingLog: [],
-  watchingAgentMeeting: false,
-
-  // Open/close meeting modal
   meetingModalOpen: false,
   openMeetingModal: () => set({ meetingModalOpen: true }),
   closeMeetingModal: () => set({ meetingModalOpen: false }),
 
-  // Start user meeting with selected agents
-  startUserMeeting: (agentIds) => {
-    const { agents } = get()
-    const seats = [
-      [-1.2, 0, -1.6], [0, 0, -1.6], [1.2, 0, -1.6],
-      [-1.2, 0, 1.6],  [0, 0, 1.6],  [1.2, 0, 1.6],
-      [-2.0, 0, 0],    [2.0, 0, 0],
-    ]
+  startUserMeeting: (agentIds, conversationId = null) => {
     set(s => ({
       meetingModalOpen: false,
       userMeetingActive: true,
       userMeetingAgentIds: agentIds,
-      meetingChatLog: [
-        { sender: 'Sistema', text: `Reunião iniciada com ${agentIds.length} agente(s).`, time: now(), isSystem: true }
-      ],
-      agents: s.agents.map((a, i) => {
-        if (agentIds.includes(a.id)) {
-          const seat = seats[agentIds.indexOf(a.id) % seats.length]
-          return { ...a, state: 'meeting', position: seat, locked: true }
-        }
-        return a
+      conversationId,
+      meetingChatLog: [{
+        sender: 'Sistema',
+        text: `Reunião iniciada com ${agentIds.length} agente(s).`,
+        time: now(), isSystem: true
+      }],
+      agents: s.agents.map((a) => {
+        if (!agentIds.includes(a.id)) return a
+        const seatIdx = agentIds.indexOf(a.id)
+        const seat = MEETING_SEATS[seatIdx % MEETING_SEATS.length]
+        return { ...a, state: 'meeting', position: seat, locked: true }
       }),
     }))
+  },
+
+  // Add agent to ongoing meeting
+  addAgentToMeeting: (agentId) => {
+    set(s => {
+      const alreadyIn = s.userMeetingAgentIds.includes(agentId)
+      if (alreadyIn) return s
+      const newIds = [...s.userMeetingAgentIds, agentId]
+      const seatIdx = newIds.length - 1
+      const seat = MEETING_SEATS[seatIdx % MEETING_SEATS.length]
+      return {
+        userMeetingAgentIds: newIds,
+        meetingChatLog: [...s.meetingChatLog, {
+          sender: 'Sistema',
+          text: `${s.agents.find(a => a.id === agentId)?.name} entrou na reunião.`,
+          time: now(), isSystem: true,
+        }],
+        agents: s.agents.map(a =>
+          a.id === agentId
+            ? { ...a, state: 'meeting', position: seat, locked: true }
+            : a
+        ),
+      }
+    })
   },
 
   endUserMeeting: () => {
     set(s => ({
       userMeetingActive: false,
       userMeetingAgentIds: [],
-      agents: s.agents.map(a => ({ ...a, locked: false, state: a.locked ? 'idle' : a.state, position: a.locked ? a.deskPosition : a.position })),
+      conversationId: null,
+      agents: s.agents.map(a => ({
+        ...a,
+        locked: false,
+        state: a.locked ? 'idle' : a.state,
+        position: a.locked ? a.deskPosition : a.position,
+      })),
     }))
   },
 
-  addMeetingMessage: (sender, text) =>
+  addMeetingMessage: (sender, text, isSystem = false) =>
     set(s => ({
-      meetingChatLog: [...s.meetingChatLog, { sender, text, time: now(), isSystem: false }],
+      meetingChatLog: [...s.meetingChatLog, { sender, text, time: now(), isSystem }],
     })),
 
-  // Agent-to-agent meeting log
+  // Agent-to-agent log
+  agentMeetingLog: [],
+  watchingAgentMeeting: false,
   addAgentMeetingLog: (msg) =>
     set(s => ({ agentMeetingLog: [...s.agentMeetingLog.slice(-50), msg] })),
-  toggleWatchAgentMeeting: () => set(s => ({ watchingAgentMeeting: !s.watchingAgentMeeting })),
+  toggleWatchAgentMeeting: () =>
+    set(s => ({ watchingAgentMeeting: !s.watchingAgentMeeting })),
 
   setAgentState: (id, state, position, taskDescription = '') =>
     set(s => ({
       agents: s.agents.map(a => {
-        if (a.id !== id) return a
-        if (a.locked) return a // não muda agente em reunião com usuário
+        if (a.id !== id || a.locked) return a
         return {
           ...a, state, position: position || a.position, taskDescription,
           taskProgress: state === 'working' ? Math.floor(Math.random() * 80) + 10

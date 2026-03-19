@@ -7,6 +7,8 @@ export default function DetailPanel() {
   const selectedAgentId = useAgentStore(s => s.selectedAgentId)
   const deselectAgent = useAgentStore(s => s.deselectAgent)
   const renameAgent = useAgentStore(s => s.renameAgent)
+  const managerId = useAgentStore(s => s.managerId)
+  const setManager = useAgentStore(s => s.setManager)
 
   const agent = agents.find(a => a.id === selectedAgentId)
   const [nameInput, setNameInput] = useState('')
@@ -60,6 +62,23 @@ export default function DetailPanel() {
         <div className="detail-field">
           <label>Função</label>
           <div className="fn-text">{agent.fn}</div>
+        </div>
+
+        {/* Manager toggle */}
+        <div className="detail-field">
+          <label>Cargo</label>
+          {managerId === agent.id ? (
+            <div style={{ color: '#fbbf24', fontSize: 12, padding: '4px 0', display: 'flex', alignItems: 'center', gap: 6 }}>
+              👑 Gerente da Sala
+            </div>
+          ) : (
+            <button
+              onClick={() => setManager(agent.id)}
+              style={{ background: 'rgba(251,191,36,0.1)', border: '1px solid rgba(251,191,36,0.3)', borderRadius: 6, color: '#fbbf24', fontSize: 11, padding: '5px 10px', cursor: 'pointer', width: '100%' }}
+            >
+              👑 Tornar Gerente
+            </button>
+          )}
         </div>
 
         {/* Current state */}

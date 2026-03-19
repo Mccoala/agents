@@ -1,7 +1,7 @@
 import { useRef, useState, useEffect, useCallback } from 'react'
 import useAgentStore from '../store/useAgentStore'
 import { CHARACTER_DESIGNS } from './characterData'
-import { DESK_LAYOUT } from './layout'
+import { DESK_LAYOUT, MEETING_SEAT_POSITIONS } from './layout'
 import Character from './Character'
 import './office2d.css'
 
@@ -36,8 +36,24 @@ function Desk({ x, y, flipped }) {
 
 function MeetingTable() {
   return (
-    <div className="meeting-table" style={{ left: 600, top: 390 }}>
-      <div className="meeting-table-top" />
+    <div style={{ position: 'absolute', left: 0, top: 0 }}>
+      {/* Chairs */}
+      {MEETING_SEAT_POSITIONS.map((pos, i) => (
+        <div key={i} style={{
+          position: 'absolute',
+          left: pos.x - 14, top: pos.y - 14,
+          width: 28, height: 28,
+          background: 'linear-gradient(to bottom,#3d2b79,#2d1b69)',
+          borderRadius: 4,
+          border: '1px solid #5b3fa0',
+          boxShadow: '0 2px 6px rgba(0,0,0,0.4)',
+          zIndex: 1,
+        }} />
+      ))}
+      {/* Table surface (on top of chairs visually) */}
+      <div className="meeting-table" style={{ left: 600, top: 390, zIndex: 2 }}>
+        <div className="meeting-table-top" />
+      </div>
     </div>
   )
 }
@@ -52,17 +68,19 @@ function CoffeeArea() {
   )
 }
 
-function AgentSprite({ agent, design, onClick }) {
+function AgentSprite({ agent, design }) {
   const [walkFrame, setWalkFrame] = useState(0)
   const [isWalking, setIsWalking] = useState(false)
   const prevPos = useRef({ x: agent.position[0], y: agent.position[2] })
   const walkTimer = useRef(null)
   const selectAgent = useAgentStore(s => s.selectAgent)
   const selectedId = useAgentStore(s => s.selectedAgentId)
+  const managerId = useAgentStore(s => s.managerId)
 
-  // Convert store position (3D x/z) to 2D screen coords
   const targetX = agent.position[0]
   const targetY = agent.position[2]
+  const isSeated = agent.state === 'meeting'
+  const isManager = agent.id === managerId
 
   useEffect(() => {
     const moved = prevPos.current.x !== targetX || prevPos.current.y !== targetY
@@ -71,15 +89,12 @@ function AgentSprite({ agent, design, onClick }) {
       prevPos.current = { x: targetX, y: targetY }
       clearInterval(walkTimer.current)
       let frame = 0
-      walkTimer.current = setInterval(() => {
-        frame++
-        setWalkFrame(frame)
-      }, 200)
-      // Stop walking after transition completes
+      // Slower, more natural walk cadence
+      walkTimer.current = setInterval(() => { frame++; setWalkFrame(frame) }, 380)
       const stop = setTimeout(() => {
         setIsWalking(false)
         clearInterval(walkTimer.current)
-      }, 900)
+      }, 1400)
       return () => { clearTimeout(stop); clearInterval(walkTimer.current) }
     }
   }, [targetX, targetY])
@@ -87,23 +102,28 @@ function AgentSprite({ agent, design, onClick }) {
   return (
     <div
       className="agent-character"
-      style={{ left: targetX - 25, top: targetY - 82 }}
+      style={{
+        left: targetX - 25,
+        top: isSeated ? targetY - 55 : targetY - 82,
+        transition: 'left 1.4s cubic-bezier(0.4,0,0.2,1), top 1.4s cubic-bezier(0.4,0,0.2,1)',
+      }}
       onClick={e => { e.stopPropagation(); selectAgent(agent.id) }}
     >
       <div className="agent-nametag">
-        <span className="agent-nametag-name">{agent.name}</span>
+        <span className="agent-nametag-name">
+          {isManager && <span style={{ marginRight: 3 }}>👑</span>}
+          {agent.name}
+        </span>
         <span className="agent-nametag-fn">{agent.fn}</span>
       </div>
       <div style={{ position: 'relative' }}>
-        <div
-          className="agent-state-dot"
-          style={{ background: STATE_DOT_COLORS[agent.state] || '#666' }}
-        />
+        <div className="agent-state-dot" style={{ background: STATE_DOT_COLORS[agent.state] || '#666' }} />
         <Character
           design={design}
           isWalking={isWalking}
           walkFrame={walkFrame}
           selected={selectedId === agent.id}
+          seated={isSeated}
         />
       </div>
     </div>

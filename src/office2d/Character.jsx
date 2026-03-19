@@ -99,16 +99,66 @@ function Tie({ color }) {
   )
 }
 
-/* Walking animation frames: 0=idle, 1=step-right, 2=step-left */
+/* Walking animation frames */
 const WALK_OFFSETS = [
-  { lLeg: 0, rLeg: 0, lArm: 0, rArm: 0 },
-  { lLeg: -5, rLeg: 5, lArm: 5, rArm: -5 },
-  { lLeg: 5, rLeg: -5, lArm: -5, rArm: 5 },
+  { lLeg: 0,   rLeg: 0,  lArm: 0,  rArm: 0  },
+  { lLeg: -12, rLeg: 12, lArm: 10, rArm: -10 },
+  { lLeg: 12,  rLeg: -12,lArm: -10,rArm: 10  },
 ]
 
-const Character = memo(function Character({ design, isWalking = false, walkFrame = 0, selected }) {
+const Character = memo(function Character({ design, isWalking = false, walkFrame = 0, selected, seated = false }) {
   const w = WALK_OFFSETS[isWalking ? walkFrame % 2 + 1 : 0]
   const { skin, hairColor, hairStyle, outfitTop, outfitBottom, shoes, accessories } = design
+
+  if (seated) {
+    return (
+      <svg width="50" height="55" viewBox="0 0 50 55" style={{ overflow: 'visible', filter: selected ? 'drop-shadow(0 0 6px #fff)' : 'none' }}>
+        {/* Chair seat */}
+        <rect x="10" y="44" width="30" height="6" rx="2" fill="#2d1b69" />
+        {/* Chair back */}
+        <rect x="10" y="28" width="4" height="18" rx="2" fill="#2d1b69" />
+        <rect x="36" y="28" width="4" height="18" rx="2" fill="#2d1b69" />
+        <rect x="10" y="26" width="30" height="5" rx="2" fill="#3d2b79" />
+        {/* Hair */}
+        <Hair style={hairStyle} color={hairColor} />
+        {/* Head */}
+        <circle cx="25" cy="16" r="12" fill={skin} />
+        <circle cx="13" cy="16" r="3" fill={skin} />
+        <circle cx="37" cy="16" r="3" fill={skin} />
+        {/* Eyes */}
+        <circle cx="20" cy="15" r="2.2" fill="#2C2C2C" />
+        <circle cx="30" cy="15" r="2.2" fill="#2C2C2C" />
+        <circle cx="21" cy="14" r="0.9" fill="white" />
+        <circle cx="31" cy="14" r="0.9" fill="white" />
+        {/* Smile */}
+        <path d="M22 20 Q25 23 28 20" stroke="#C0392B" strokeWidth="1.2" fill="none" strokeLinecap="round" />
+        {accessories.includes('glasses') && (
+          <g stroke="#333" strokeWidth="1" fill="none">
+            <circle cx="20" cy="15" r="3.5" /><circle cx="30" cy="15" r="3.5" />
+            <line x1="23.5" y1="15" x2="26.5" y2="15" /><line x1="12" y1="14" x2="16.5" y2="15" />
+          </g>
+        )}
+        {accessories.includes('headset') && (
+          <g>
+            <path d="M13 16 Q13 8 25 8 Q37 8 37 16" stroke="#333" strokeWidth="1.5" fill="none" />
+            <rect x="10" y="14" width="4" height="6" rx="2" fill="#333" />
+            <rect x="36" y="14" width="4" height="6" rx="2" fill="#333" />
+          </g>
+        )}
+        {/* Body (visible above chair) */}
+        <rect x="15" y="27" width="20" height="18" rx="3" fill={outfitTop} />
+        {/* Arms on table */}
+        <rect x="5"  y="30" width="11" height="7" rx="3.5" fill={outfitTop} />
+        <rect x="34" y="30" width="11" height="7" rx="3.5" fill={outfitTop} />
+        {accessories.includes('tie') && (
+          <polygon points="25,27 23,34 25,40 27,34" fill="#E74C3C" />
+        )}
+        {/* Legs (bent, going into seat) */}
+        <rect x="15" y="43" width="9" height="8" rx="3" fill={outfitBottom} />
+        <rect x="26" y="43" width="9" height="8" rx="3" fill={outfitBottom} />
+      </svg>
+    )
+  }
 
   return (
     <svg width="50" height="82" viewBox="0 0 50 82" style={{ overflow: 'visible', filter: selected ? 'drop-shadow(0 0 6px #fff)' : 'none' }}>
