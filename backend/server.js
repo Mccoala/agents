@@ -3,68 +3,69 @@ import express from 'express'
 import cors from 'cors'
 import { askAgent } from './lib/claude.js'
 import { createConversation, saveMessage, getMessages, endConversation } from './lib/supabase.js'
-import { getFile, listFiles } from './lib/github.js'
+import { startAutonomousLoop, addSseClient, removeSseClient } from './autonomy/agentLoop.js'
 
 const app = express()
 app.use(cors({ origin: '*' }))
 app.use(express.json())
 
-// In-memory conversation history per conversation ID (for Claude context)
 const conversationHistories = {}
 
-// ── Health check ──
-app.get('/health', (_, res) => res.json({ ok: true }))
+// ── Health ──
+app.get('/health', (_, res) => res.json({ ok: true, time: new Date().toISOString() }))
 
-// ── Start a meeting ──
-// Body: { agentIds: number[], agentNames: string[], agentFns: string[] }
+// ── SSE: frontend subscribes to live agent events ──
+app.get('/api/events', (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream')
+  res.setHeader('Cache-Control', 'no-cache')
+  res.setHeader('Connection', 'keep-alive')
+  res.flushHeaders()
+
+  // Send heartbeat every 25s to keep connection alive
+  const hb = setInterval(() => res.write(':heartbeat\n\n'), 25000)
+  addSseClient(res)
+
+  req.on('close', () => {
+    clearInterval(hb)
+    removeSseClient(res)
+  })
+})
+
+// ── Start meeting ──
 app.post('/api/meeting/start', async (req, res) => {
   try {
     const { agentIds, agentNames, agentFns } = req.body
-
-    // Create conversation in Supabase
     const conv = await createConversation('user', agentIds)
-
-    // Init history
     conversationHistories[conv.id] = []
-
-    // Welcome message
-    const welcome = `Reunião iniciada com: ${agentNames.join(', ')}. Como posso ajudar?`
+    const welcome = `Olá! Reunião iniciada com ${agentNames.join(', ')}. Como posso ajudar?`
     await saveMessage(conv.id, 'Sistema', welcome, true)
-
     res.json({ conversationId: conv.id, welcome })
   } catch (err) {
-    console.error(err)
     res.status(500).json({ error: err.message })
   }
 })
 
-// ── Send message in meeting ──
-// Body: { conversationId: string, message: string, agentFn: string, agentName: string }
+// ── Send message ──
 app.post('/api/meeting/message', async (req, res) => {
   try {
     const { conversationId, message, agentFn, agentName } = req.body
+    if (!conversationHistories[conversationId]) conversationHistories[conversationId] = []
 
-    if (!conversationHistories[conversationId]) {
-      conversationHistories[conversationId] = []
-    }
-
-    // Save user message
     await saveMessage(conversationId, 'Você', message)
 
-    // Get agent response from Claude
-    const history = conversationHistories[conversationId]
-    const reply = await askAgent(agentFn, history, message)
+    const reply = await askAgent(agentFn, conversationHistories[conversationId], message)
 
-    // Update history
-    history.push({ role: 'user', content: message })
-    history.push({ role: 'assistant', content: reply })
+    conversationHistories[conversationId].push({ role: 'user', content: message })
+    conversationHistories[conversationId].push({ role: 'assistant', content: reply })
 
-    // Save agent reply
+    // Keep history bounded
+    if (conversationHistories[conversationId].length > 20) {
+      conversationHistories[conversationId] = conversationHistories[conversationId].slice(-20)
+    }
+
     await saveMessage(conversationId, agentName, reply)
-
     res.json({ reply, sender: agentName })
   } catch (err) {
-    console.error(err)
     res.status(500).json({ error: err.message })
   }
 })
@@ -83,35 +84,35 @@ app.get('/api/meeting/:id/messages', async (req, res) => {
 app.post('/api/meeting/end', async (req, res) => {
   try {
     const { conversationId } = req.body
-    await endConversation(conversationId)
-    delete conversationHistories[conversationId]
+    if (conversationId) {
+      await endConversation(conversationId)
+      delete conversationHistories[conversationId]
+    }
     res.json({ ok: true })
   } catch (err) {
     res.status(500).json({ error: err.message })
   }
 })
 
-// ── GitHub: list repo files ──
-app.get('/api/repo/files', async (req, res) => {
+// ── Get recent agent meetings ──
+app.get('/api/agent-meetings', async (req, res) => {
   try {
-    const { path = '' } = req.query
-    const files = await listFiles(path)
-    res.json(files)
-  } catch (err) {
-    res.status(500).json({ error: err.message })
-  }
-})
-
-// ── GitHub: get file content ──
-app.get('/api/repo/file', async (req, res) => {
-  try {
-    const { path } = req.query
-    const { content } = await getFile(path)
-    res.json({ content })
+    const { createClient } = await import('@supabase/supabase-js')
+    const { supabase } = await import('./lib/supabase.js')
+    const { data } = await supabase
+      .from('conversations')
+      .select('*, messages(*)')
+      .eq('type', 'agent')
+      .order('created_at', { ascending: false })
+      .limit(10)
+    res.json(data || [])
   } catch (err) {
     res.status(500).json({ error: err.message })
   }
 })
 
 const PORT = process.env.PORT || 3001
-app.listen(PORT, () => console.log(`✅ Agents backend running on http://localhost:${PORT}`))
+app.listen(PORT, () => {
+  console.log(`✅ Agents backend on http://localhost:${PORT}`)
+  startAutonomousLoop(8) // reunião autônoma a cada 8 minutos
+})
