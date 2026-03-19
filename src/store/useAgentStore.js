@@ -23,9 +23,10 @@ const useAgentStore = create((set, get) => ({
   toggleHud: () => set(s => ({ hudVisible: !s.hudVisible })),
 
   // Meeting state
-  userMeetingActive: false,       // usuário está em reunião
-  userMeetingAgentIds: [],        // agentes convocados pelo usuário
-  meetingChatLog: [],             // chat da reunião do usuário
+  userMeetingActive: false,
+  userMeetingAgentIds: [],
+  conversationId: null,           // Supabase conversation ID
+  meetingChatLog: [],
 
   // Agent-to-agent meetings chat log (para acompanhar)
   agentMeetingLog: [],
