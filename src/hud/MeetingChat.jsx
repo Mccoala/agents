@@ -49,6 +49,19 @@ export default function MeetingChat() {
       })
       const data = await res.json()
       if (data.error) throw new Error(data.error)
+
+      // Show tool calls as system messages if any
+      if (data.toolCalls && data.toolCalls.length > 0) {
+        data.toolCalls.forEach(tc => {
+          const label = tc.tool === 'read_file' ? `📄 leu ${tc.input.path}`
+            : tc.tool === 'list_files' ? `📁 listou ${tc.input.path}`
+            : tc.tool === 'search_in_file' ? `🔍 buscou "${tc.input.term}" em ${tc.input.path}`
+            : tc.tool === 'create_fix' ? `🔧 abriu PR: ${tc.result?.pr_url || tc.input.pr_title}`
+            : `🛠 ${tc.tool}`
+          addMeetingMessage('Sistema', label, true)
+        })
+      }
+
       addMeetingMessage(data.sender, data.reply)
     } catch (err) {
       addMeetingMessage('Sistema', `❌ Erro: ${err.message}`, true)

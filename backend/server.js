@@ -53,18 +53,18 @@ app.post('/api/meeting/message', async (req, res) => {
 
     await saveMessage(conversationId, 'Você', message)
 
-    const reply = await askAgent(agentFn, conversationHistories[conversationId], message)
+    const { text, toolCalls } = await askAgent(agentFn, conversationHistories[conversationId], message)
 
     conversationHistories[conversationId].push({ role: 'user', content: message })
-    conversationHistories[conversationId].push({ role: 'assistant', content: reply })
+    conversationHistories[conversationId].push({ role: 'assistant', content: text })
 
     // Keep history bounded
     if (conversationHistories[conversationId].length > 20) {
       conversationHistories[conversationId] = conversationHistories[conversationId].slice(-20)
     }
 
-    await saveMessage(conversationId, agentName, reply)
-    res.json({ reply, sender: agentName })
+    await saveMessage(conversationId, agentName, text)
+    res.json({ reply: text, toolCalls, sender: agentName })
   } catch (err) {
     res.status(500).json({ error: err.message })
   }
