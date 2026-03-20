@@ -35,6 +35,7 @@ export async function askAgent(agentFn, conversationHistory, userMessage) {
 
     if (response.stop_reason === 'tool_use') {
       // Add assistant's response (with tool_use blocks) to messages
+      console.log(`🔍 DEBUG tool_use response.content:`, JSON.stringify(response.content))
       messages.push({ role: 'assistant', content: response.content })
 
       // Execute all tool calls in parallel
