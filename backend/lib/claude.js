@@ -2,10 +2,9 @@ import Anthropic from '@anthropic-ai/sdk'
 import { AGENT_PROMPTS } from '../agents/prompts.js'
 import { AGENT_TOOLS, executeTool } from './tools.js'
 
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
-
 // Ask agent with full tool access — agentic loop
 export async function askAgent(agentFn, conversationHistory, userMessage) {
+  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
   const systemPrompt = AGENT_PROMPTS[agentFn] || AGENT_PROMPTS['Monitor / Analista']
   const messages = [
     ...conversationHistory,
@@ -72,6 +71,7 @@ export async function askAgent(agentFn, conversationHistory, userMessage) {
 // Simpler version for autonomous analysis (Haiku, no history)
 // onToolUse(toolName, input) is called just before each tool executes — used for real-time SSE broadcast
 export async function agentAnalyzeWithTools(agentFn, agentName, focusFiles, onToolUse = null) {
+  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
   const systemPrompt = AGENT_PROMPTS[agentFn]
   const messages = [{
     role: 'user',
