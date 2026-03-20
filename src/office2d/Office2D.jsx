@@ -76,6 +76,7 @@ function AgentSprite({ agent, design }) {
   const selectAgent = useAgentStore(s => s.selectAgent)
   const selectedId = useAgentStore(s => s.selectedAgentId)
   const managerId = useAgentStore(s => s.managerId)
+  const activityBubble = useAgentStore(s => s.activityBubbles?.[agent.id])
 
   const targetX = agent.position[0]
   const targetY = agent.position[2]
@@ -109,6 +110,9 @@ function AgentSprite({ agent, design }) {
       }}
       onClick={e => { e.stopPropagation(); selectAgent(agent.id) }}
     >
+      {activityBubble && (
+        <div className="activity-bubble">{activityBubble}</div>
+      )}
       <div className="agent-nametag">
         <span className="agent-nametag-name">
           {isManager && <span style={{ marginRight: 3 }}>👑</span>}

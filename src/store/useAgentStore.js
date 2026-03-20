@@ -12,6 +12,7 @@ const buildInitialAgents = () =>
     taskProgress: 0,
     taskDescription: '',
     locked: false,
+    lastRealActivity: 0,  // timestamp of last SSE-driven activity
   }))
 
 const useAgentStore = create((set, get) => ({
@@ -96,6 +97,34 @@ const useAgentStore = create((set, get) => ({
   addMeetingMessage: (sender, text, isSystem = false) =>
     set(s => ({
       meetingChatLog: [...s.meetingChatLog, { sender, text, time: now(), isSystem }],
+    })),
+
+  // Activity bubbles — show tool/action above character head (pixel-agents style)
+  activityBubbles: {},
+  setActivityBubble: (id, text) => {
+    set(s => ({ activityBubbles: { ...s.activityBubbles, [id]: text } }))
+    setTimeout(() => {
+      set(s => {
+        const b = { ...s.activityBubbles }
+        delete b[id]
+        return { activityBubbles: b }
+      })
+    }, 4500)
+  },
+
+  // Mark agent as having real SSE activity (suppresses fake behavior loop)
+  setAgentRealActivity: (id, state, position, taskDescription = '') =>
+    set(s => ({
+      agents: s.agents.map(a => {
+        if (a.id !== id || a.locked) return a
+        return {
+          ...a, state, position: position || a.position, taskDescription,
+          lastRealActivity: Date.now(),
+          taskProgress: state === 'working' ? Math.floor(Math.random() * 80) + 10
+                      : state === 'done'    ? 100
+                      : a.taskProgress,
+        }
+      }),
     })),
 
   // Agent-to-agent log

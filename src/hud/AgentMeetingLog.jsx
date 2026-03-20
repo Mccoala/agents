@@ -5,8 +5,8 @@ const BACKEND = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001'
 
 export default function AgentMeetingLog() {
   const toggleWatchAgentMeeting = useAgentStore(s => s.toggleWatchAgentMeeting)
-  const setAgentState = useAgentStore(s => s.setAgentState)
-  const agents = useAgentStore(s => s.agents)
+  const setAgentRealActivity = useAgentStore(s => s.setAgentRealActivity)
+  const setActivityBubble = useAgentStore(s => s.setActivityBubble)
 
   const [messages, setMessages] = useState([])
   const [connected, setConnected] = useState(false)
@@ -31,20 +31,43 @@ export default function AgentMeetingLog() {
     })
 
     es.addEventListener('agent_message', (e) => {
-      const { sender, text, agentId } = JSON.parse(e.data)
-      setMessages(m => [...m.slice(-60), { sender, text, time: t(), isSystem: false, agentId }])
+      const { sender, text, agentId, isSystem } = JSON.parse(e.data)
+      setMessages(m => [...m.slice(-60), { sender, text, time: t(), isSystem: !!isSystem, agentId }])
 
-      // Update agent state in office
+      // Drive real agent state from SSE — read fresh store state to avoid stale closure
       if (agentId) {
-        const agent = agents.find(a => a.id === agentId)
+        const agent = useAgentStore.getState().agents.find(a => a.id === agentId)
         if (agent && !agent.locked) {
-          setAgentState(agentId, 'working', agent.deskPosition, text.slice(0, 60))
+          setAgentRealActivity(agentId, 'working', agent.deskPosition, text.slice(0, 60))
+        }
+      }
+    })
+
+    // Real-time tool use broadcasts (pixel-agents transcript parser concept)
+    es.addEventListener('agent_tool_use', (e) => {
+      const { agentId, description } = JSON.parse(e.data)
+      if (agentId) {
+        setActivityBubble(agentId, description)
+        const agent = useAgentStore.getState().agents.find(a => a.id === agentId)
+        if (agent && !agent.locked) {
+          setAgentRealActivity(agentId, 'working', agent.deskPosition, description)
         }
       }
     })
 
     es.addEventListener('agent_meeting_end', () => {
       setMessages(m => [...m, { sender: 'Sistema', text: '✅ Reunião concluída', time: t(), isSystem: true }])
+    })
+
+    // Reset agents to idle when meeting truly ends
+    es.addEventListener('agent_idle', (e) => {
+      const { agentIds } = JSON.parse(e.data)
+      agentIds?.forEach(id => {
+        const agent = useAgentStore.getState().agents.find(a => a.id === id)
+        if (agent && !agent.locked) {
+          setAgentRealActivity(id, 'idle', agent.deskPosition, '')
+        }
+      })
     })
 
     // Load recent meetings on mount

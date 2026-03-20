@@ -16,6 +16,9 @@ export function startAgentBehavior(store) {
         const current = agents.find(a => a.id === agent.id)
         if (!current || current.locked) return
 
+        // Back off for 30s when real SSE activity is driving this agent
+        if (current.lastRealActivity && Date.now() - current.lastRealActivity < 30000) return
+
         const next = pickNext(current.state, idx)
         const pos  = posForState(next, current, idx)
         setAgentState(agent.id, next, pos, '')
